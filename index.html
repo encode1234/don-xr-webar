@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>DON XR · 짱짱이 WebAR 데모</title>
 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+<script src="chat.js"></script>
 <style>
   :root{ --pink:#ff5aa7; --ink:#1b1330 }
   *{box-sizing:border-box} html,body{margin:0;height:100%;overflow:hidden}
@@ -60,10 +61,11 @@
     <p>KBS 애니메이션 「돈(DON)」 · 앱 없이 폰 브라우저로</p>
   </div>
 
-  <p class="hint" id="hint">손가락으로 <b>돌려보고 확대</b>하세요.</p>
+  <p class="hint" id="hint">손가락으로 <b>돌려보고 확대</b>하세요. 가까이 <b>확대하면 짱짱이가 먼저 말을 걸어요!</b></p>
 
   <div class="bottom">
     <button class="live-btn" id="liveBtn">📷 라이브 카메라에 짱짱이 띄우기</button>
+    <button class="mic-btn" id="micBtn">🎤 말 걸기</button>
     <button class="ar-btn" id="arBtn">🧭 바닥에 배치 (공간 AR)</button>
     <a class="ar-btn" href="webxr.html" style="text-decoration:none;display:inline-flex;align-items:center;background:#3a2f66">🤖 인페이지 바닥고정 (안드로이드)</a>
     <button class="close-btn" id="closeBtn">✕ 카메라 끄기</button>
@@ -99,6 +101,28 @@
   document.getElementById('arBtn').addEventListener('click', ()=>{
     if(mv.canActivateAR) mv.activateAR();
     else alert('이 기기는 공간 AR(바닥 배치)이 제한돼요. 대신 "📷 라이브 카메라"를 눌러보세요!');
+  });
+
+  // ③ 대화 — 근접 트리거 + 음성 인식(온디바이스)
+  const chatUI = DonChat.mount();
+  const micBtn = document.getElementById('micBtn');
+  DonChat.setMic(micBtn);
+  micBtn.addEventListener('click', ()=>{ DonChat.open(); DonChat.listen(); });
+
+  // 근접 판정 = 짱짱이에게 가까이 다가가면(확대) 먼저 말을 건다
+  // ⚠️ 모델 로드 전 getCameraOrbit()은 기본값(-2.2)이라 그대로 쓰면 즉시 오발동
+  //    → 로드 후 '기준 거리'를 잡고 그 비율로 판정 + 사용자 조작 후에만 무장(오디오 정책)
+  let baseR = 0, armed = false, nearOnce = false;
+  ['pointerdown','touchstart','click'].forEach(ev=>
+    addEventListener(ev, ()=>{ armed = true; }, {once:true, passive:true}));
+
+  mv.addEventListener('camera-change', ()=>{
+    const r = mv.getCameraOrbit().radius;
+    if(r <= 0) return;                       // 로드 전 기본값(-2.2) 무시
+    if(baseR <= 0){ baseR = r; return; }      // 첫 유효값 = 기준 거리
+    if(!armed) return;                        // 사용자 조작 후에만 (오디오 정책)
+    if(r < baseR*0.55 && !nearOnce){ nearOnce=true; DonChat.proximity(true); }   // 가까이 → 인사
+    else if(r > baseR*0.85 && nearOnce){ nearOnce=false; DonChat.resetProximity(); } // 멀어지면 재무장
   });
 </script>
 </body>

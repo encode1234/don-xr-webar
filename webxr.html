@@ -11,6 +11,10 @@
   #info b{color:#ff8ec4}
   #note{position:fixed;bottom:80px;left:0;right:0;z-index:5;text-align:center;font-size:12px;color:#cbb8e0;padding:0 20px;pointer-events:none}
   a.back{position:fixed;top:10px;left:10px;z-index:6;color:#fff;background:#0008;border-radius:10px;padding:8px 12px;font-size:13px;text-decoration:none}
+  #micBtn{position:fixed;right:12px;bottom:150px;z-index:7;display:none;border:0;border-radius:14px;
+    padding:12px 16px;font-weight:800;font-size:14px;color:#fff;background:linear-gradient(135deg,#00b894,#0984e3)}
+  body.placed #micBtn{display:block}
+  #micBtn.on{background:#e0466e}
 </style>
 <script type="importmap">
 { "imports": {
@@ -22,7 +26,9 @@
 <body>
 <a class="back" href="index.html">← 뒤로</a>
 <div id="info"><b>짱짱이</b> 인페이지 WebXR · 바닥을 비추고 <b>화면을 탭</b>하면 그 자리에 고정돼요 (걸어서 돌아보기)</div>
-<div id="note">※ 안드로이드 Chrome(ARCore) 전용 · 아이폰(사파리)은 미지원 → 아이폰은 앞 페이지의 "바닥에 배치" 사용</div>
+<div id="note">※ 안드로이드 Chrome(ARCore) 전용 · 아이폰(사파리)은 미지원 → 아이폰은 앞 페이지의 "바닥에 배치" 사용<br>배치 후 <b>가까이 다가가면 짱짱이가 먼저 말을 걸어요</b></div>
+<button id="micBtn">🎤 말 걸기</button>
+<script src="chat.js"></script>
 
 <script type="module">
 import * as THREE from 'three';
@@ -69,6 +75,8 @@ function init(){
       model.position.setFromMatrixPosition(reticle.matrix);
       model.quaternion.setFromRotationMatrix(reticle.matrix);
       model.visible=true;
+      document.body.classList.add('placed');
+      DonChat.open(); DonChat.resetProximity();   // 배치 직후부터 근접 감지
     }
   });
   scene.add(controller);
@@ -81,9 +89,17 @@ function init(){
     session.addEventListener('end', ()=>{ hitTestSource=null; placed=false; if(model) model.visible=false; });
   });
 
+  // 대화 UI
+  DonChat.mount();
+  const micBtn = document.getElementById('micBtn');
+  DonChat.setMic(micBtn);
+  micBtn.addEventListener('click', ()=>{ DonChat.open(); DonChat.listen(); });
+
   renderer.setAnimationLoop(render);
   addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
 }
+
+const _camPos = new THREE.Vector3();
 
 function render(t, frame){
   if(frame && hitTestSource && localSpace && !placed){
@@ -93,6 +109,16 @@ function render(t, frame){
       reticle.visible=true; reticle.matrix.fromArray(pose.transform.matrix);
     } else reticle.visible=false;
   }
+
+  // 근접 트리거 — 관람객이 1.2m 안으로 다가오면 짱짱이가 먼저 말을 건다
+  if(placed && model){
+    renderer.xr.getCamera().getWorldPosition(_camPos);
+    const d = _camPos.distanceTo(model.position);
+    DonChat.proximity(d < 1.2);
+    if(d > 2.0) DonChat.resetProximity();          // 멀어지면 다시 인사 가능
+    model.lookAt(_camPos.x, model.position.y, _camPos.z);  // 관람객 쪽 바라보기
+  }
+
   renderer.render(scene, camera);
 }
 </script>
