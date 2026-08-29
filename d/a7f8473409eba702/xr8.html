@@ -12,8 +12,10 @@
 <style>
   html,body{margin:0;height:100%;overflow:hidden;background:#0b0b12;color:#fff;
     font-family:system-ui,'Malgun Gothic',sans-serif;-webkit-text-size-adjust:100%}
-  #cam{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0}
-  #info{position:fixed;top:0;left:0;right:0;z-index:5;text-align:center;padding:12px 16px;font-size:13px;
+  /* 8th Wall의 Three.js 모듈이 매 프레임 renderer.setSize(canvas.width,canvas.height)를 호출하며
+     캔버스에 인라인 style(width/height px)을 덮어쓴다 → !important로 전체화면 고정 */
+  #cam{position:fixed;inset:0;width:100%!important;height:100%!important;display:block;z-index:0}
+  #info{position:fixed;top:0;left:0;right:0;z-index:5;text-align:center;padding:52px 16px 12px;font-size:13px;
     background:linear-gradient(#000000cc,transparent);pointer-events:none;line-height:1.5}
   #info b{color:#ff8ec4}
   a.back{position:fixed;top:10px;left:10px;z-index:6;color:#fff;background:#0008;border-radius:10px;
@@ -123,6 +125,20 @@ function scenePipelineModule() {
   };
 }
 
+// 캔버스 드로잉버퍼를 화면 크기로 맞춘다.
+// 지정하지 않으면 HTML 기본값 300x150이라 카메라 화면이 좌상단 작은 박스로 뜨고,
+// 탭 좌표(innerWidth/innerHeight 기준)와 어긋나 배치·대화가 아예 동작하지 않는다.
+const camEl = document.getElementById('cam');
+function fitCanvas() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr);
+  if (camEl.width === w && camEl.height === h) return;
+  camEl.width = w; camEl.height = h;   // 엔진이 onCanvasSizeChange로 감지해 렌더러를 갱신
+}
+fitCanvas();
+addEventListener('resize', fitCanvas);
+addEventListener('orientationchange', () => setTimeout(fitCanvas, 300));  // iOS 회전 후 지연 반영
+
 function start() {
   try {
     // 지원 기기 확인 — 데스크톱 등에서는 세션이 열리지 않으므로 먼저 안내
@@ -140,7 +156,8 @@ function start() {
       XR8.XrController.pipelineModule(),        // SLAM 월드트래킹(6DoF)
       scenePipelineModule(),
     ]);
-    XR8.run({ canvas: document.getElementById('cam') });
+    fitCanvas();
+    XR8.run({ canvas: camEl });
   } catch (e) {
     showErr('AR 엔진 초기화 실패: ' + e);
   }
