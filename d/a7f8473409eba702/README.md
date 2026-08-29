@@ -1,6 +1,6 @@
 # 짱짱이 WebAR 데모
 
-**라이브 (폰으로 열기)**: https://encode1234.github.io/don-xr-webar/
+**라이브 (폰으로 열기)**: https://encode1234.github.io/don-xr-webar/d/a7f8473409eba702/  · **접속 암호 `don2026`**
 > ⚠️ 아이폰은 **사파리(Safari)로** 여세요 (카톡·인스타 등 인앱브라우저는 AR 안 됨)
 
 ## 3가지 모드
@@ -49,7 +49,7 @@
 - `jangjang.glb`(짱짱이 v2, **0.5m**) · `jangjang.usdz`(iOS AR)
 
 ## 배포·갱신 (GitHub Pages)
-- 저장소: `encode1234/don-xr-webar` (public, main/root)
+- 저장소: `encode1234/don-xr-webar` (public, main/root) — **데모는 `d/<token>/` 하위**, 루트는 차단 페이지
 - 파일 수정 → push → Pages 자동 재빌드(~1분) → 새로고침
 - 모델 교체: `jangjang.glb`/`.usdz` 교체 후 push · 크기조절: Blender 헤드리스 재스케일
 
@@ -65,3 +65,22 @@
 - 🔴 **§7.2**: 양측 **5일 통보로 해지 가능**(revocable) — 장기 의존 리스크
 - ⚠️ **§1.3 저작자 표시 의무** → `xr8.html` 하단에 Niantic 저작권·라이선스 링크 표기함(삭제 금지)
 - 엔진 개조·리버스엔지니어링 금지, 유사 경쟁제품 제작 금지
+
+## 🔒 비공개 운영 (2026-08-29 NEO 지시)
+"나만 볼 수 있게" → **비공개 경로 + 암호** 2단 차단.
+| 장치 | 내용 |
+|---|---|
+| 비공개 경로 | 데모 전체가 `/d/a7f8473409eba702/` 하위. 루트(`/`)는 "비공개 페이지" 안내만 노출 |
+| 암호 게이트 | `gate.js` — 통과 전 화면 전체 차단. 암호 `don2026` (SHA-256 해시 비교, 세션·로컬 저장) |
+| 검색 차단 | 전 페이지 `noindex,nofollow,noarchive` + `robots.txt` Disallow |
+| 구주소 차단 | 기존 공개 URL(`/index.html`·`/webxr.html` 등) 전부 **404** 확인 |
+
+⚠️ **한계**: 정적 호스팅이라 암호 해시가 소스에 포함된다. **우연한 노출·검색 유입 차단용**이며, 작정하고 소스를 뜯으면 우회 가능. 진짜 접근제어가 필요하면 Cloudflare Access 등 서버 인증 필요.
+
+**암호 변경**: `gate.js`의 `PW_HASH` 교체
+```
+python -c "import hashlib;print(hashlib.sha256('새암호'.encode()).hexdigest())"
+```
+→ 변경 시 **기술서·붙임3·기획서·사업계획서의 암호 표기도 함께** 고칠 것.
+
+**경로 변경(주소 노출 시)**: 저장소의 `d/<token>/` 폴더명을 새 토큰으로 바꾸고 push → 문서 URL·QR 재생성(`_mk_데모안내.py`).
