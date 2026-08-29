@@ -67,7 +67,7 @@
     <button class="live-btn" id="liveBtn">📷 라이브 카메라에 짱짱이 띄우기</button>
     <button class="mic-btn" id="micBtn">🎤 말 걸기</button>
     <button class="ar-btn" id="arBtn">🧭 바닥에 배치 (공간 AR)</button>
-    <a class="ar-btn" href="webxr.html" style="text-decoration:none;display:inline-flex;align-items:center;background:#3a2f66">🤖 인페이지 바닥고정 (안드로이드)</a>
+    <button class="ar-btn" id="inpageBtn" style="background:#3a2f66">✨ 인페이지 AR + 대화 (전 기기)</button>
     <button class="close-btn" id="closeBtn">✕ 카메라 끄기</button>
   </div>
 </div>
@@ -101,6 +101,15 @@
   document.getElementById('arBtn').addEventListener('click', ()=>{
     if(mv.canActivateAR) mv.activateAR();
     else alert('이 기기는 공간 AR(바닥 배치)이 제한돼요. 대신 "📷 라이브 카메라"를 눌러보세요!');
+  });
+
+  // ②-2 인페이지 AR 기기 자동분기
+  //   안드로이드: WebXR 네이티브(가벼움, 추가 다운로드 없음)
+  //   아이폰 등:  8th Wall CV/SLAM 엔진(iOS Safari는 WebXR 미지원)
+  document.getElementById('inpageBtn').addEventListener('click', async ()=>{
+    let hasWebXR=false;
+    try{ hasWebXR = !!(navigator.xr && await navigator.xr.isSessionSupported('immersive-ar')); }catch(e){}
+    location.href = hasWebXR ? 'webxr.html' : 'xr8.html';
   });
 
   // ③ 대화 — 근접 트리거 + 음성 인식(온디바이스)

@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>짱짱이 · 인페이지 AR (아이폰·안드로이드)</title>
+<!-- 8th Wall 엔진(오픈소스 배포 바이너리) — SLAM 청크 프리로드, 앱키 불필요 -->
+<script src="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1/dist/xr.js"
+        async crossorigin="anonymous" data-preload-chunks="slam"></script>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0b0b12;color:#fff;
+    font-family:system-ui,'Malgun Gothic',sans-serif;-webkit-text-size-adjust:100%}
+  #cam{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0}
+  #info{position:fixed;top:0;left:0;right:0;z-index:5;text-align:center;padding:12px 16px;font-size:13px;
+    background:linear-gradient(#000000cc,transparent);pointer-events:none;line-height:1.5}
+  #info b{color:#ff8ec4}
+  a.back{position:fixed;top:10px;left:10px;z-index:6;color:#fff;background:#0008;border-radius:10px;
+    padding:8px 12px;font-size:13px;text-decoration:none}
+  #micBtn{position:fixed;right:12px;bottom:150px;z-index:7;display:none;border:0;border-radius:14px;
+    padding:12px 16px;font-weight:800;font-size:14px;color:#fff;background:linear-gradient(135deg,#00b894,#0984e3)}
+  body.placed #micBtn{display:block}
+  #micBtn.on{background:#e0466e}
+  #err{position:fixed;inset:auto 16px 16px;z-index:8;background:#e0466ecc;border-radius:14px;
+    padding:14px;font-size:14px;display:none;line-height:1.5}
+  /* 라이선스 §1.3 저작자 표시 의무 */
+  #attr{position:fixed;left:0;right:0;bottom:4px;z-index:6;text-align:center;font-size:10px;color:#ffffff99}
+  #attr a{color:#ffffffcc}
+</style>
+</head>
+<body>
+<canvas id="cam"></canvas>
+<a class="back" href="index.html">← 뒤로</a>
+<div id="info"><b>짱짱이</b> 인페이지 AR · 바닥을 비추고 <b>화면을 탭</b>하면 그 자리에 고정돼요<br>
+배치 후 <b>가까이 다가가면 짱짱이가 먼저 말을 걸어요</b></div>
+<button id="micBtn">🎤 말 걸기</button>
+<div id="err"></div>
+<div id="attr">AR engine: 8th Wall XR Engine © 2026 Niantic Spatial, Inc. ·
+  <a href="https://cdn.jsdelivr.net/npm/@8thwall/engine-binary@1.0.0/LICENSE" target="_blank" rel="noopener">License</a></div>
+
+<script src="chat.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+// XR8.Threejs 모듈은 전역 THREE를 사용한다 (ES 모듈로 불러와 전역에 얹어줌)
+window.THREE = THREE;
+
+const errEl = document.getElementById('err');
+const showErr = (m) => { errEl.style.display = 'block'; errEl.innerHTML = m; };
+
+let model = null, placed = false, ground = null;
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+const camPos = new THREE.Vector3();
+
+function scenePipelineModule() {
+  return {
+    name: 'don-scene',
+    onStart({ canvas }) {
+      const { scene, camera, renderer } = XR8.Threejs.xrScene();
+
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.5));
+      const dir = new THREE.DirectionalLight(0xffffff, 1.6);
+      dir.position.set(1, 3, 2); scene.add(dir);
+
+      // 바닥(탭 배치용, 보이지 않음)
+      ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(100, 100).rotateX(-Math.PI / 2),
+        new THREE.MeshBasicMaterial({ visible: false })
+      );
+      scene.add(ground);
+
+      new GLTFLoader().load('jangjang.glb', (g) => { model = g.scene; model.visible = false; scene.add(model); },
+        undefined, () => showErr('짱짱이 모델을 불러오지 못했어요.'));
+
+      // 탭 → 배치
+      canvas.addEventListener('touchstart', place, { passive: true });
+      canvas.addEventListener('click', place);
+      function place(e) {
+        if (!model) return;
+        const t = e.touches ? e.touches[0] : e;
+        pointer.x = (t.clientX / innerWidth) * 2 - 1;
+        pointer.y = -(t.clientY / innerHeight) * 2 + 1;
+        raycaster.setFromCamera(pointer, camera);
+        const hit = raycaster.intersectObject(ground)[0];
+        if (!hit) return;
+        model.position.copy(hit.point);
+        model.visible = true;
+        if (!placed) {
+          placed = true;
+          document.body.classList.add('placed');
+          DonChat.open(); DonChat.resetProximity();
+          document.getElementById('info').innerHTML =
+            '짱짱이가 <b>그 자리에 고정</b>됐어요! 걸어서 돌아보고, <b>가까이 다가가 보세요</b>';
+        }
+      }
+      XR8.XrController.recenter();
+    },
+
+    onUpdate() {
+      if (!placed || !model) return;
+      const { camera } = XR8.Threejs.xrScene();
+      camera.getWorldPosition(camPos);
+      const d = camPos.distanceTo(model.position);
+      DonChat.proximity(d < 1.2);              // 1.2m 이내 → 먼저 인사
+      if (d > 2.0) DonChat.resetProximity();   // 멀어지면 재무장
+      model.lookAt(camPos.x, model.position.y, camPos.z);  // 관람객 쪽 응시
+    },
+
+    onException(err) {
+      console.error(err);
+      showErr('AR 시작 실패: ' + (err && err.message ? err.message : err) +
+        '<br>카메라 권한을 허용했는지, HTTPS로 열었는지 확인해 주세요.');
+    },
+  };
+}
+
+function start() {
+  try {
+    // 지원 기기 확인 — 데스크톱 등에서는 세션이 열리지 않으므로 먼저 안내
+    if (XR8.XrDevice.isDeviceBrowserCompatible && !XR8.XrDevice.isDeviceBrowserCompatible()) {
+      const d = XR8.XrDevice.deviceEstimate ? XR8.XrDevice.deviceEstimate() : {};
+      showErr('이 기기·브라우저(' + (d.os || '?') + ' / ' + ((d.browser && d.browser.name) || '?') +
+        ')에서는 인페이지 AR을 사용할 수 없어요.<br><b>스마트폰</b>에서 열어 주세요. ' +
+        '(아이폰=사파리, 안드로이드=크롬)');
+      return;
+    }
+    XR8.XrController.configure({ scale: 'absolute', enableLighting: true });
+    XR8.addCameraPipelineModules([
+      XR8.GlTextureRenderer.pipelineModule(),   // 카메라 영상 → 캔버스
+      XR8.Threejs.pipelineModule(),             // three.js 씬
+      XR8.XrController.pipelineModule(),        // SLAM 월드트래킹(6DoF)
+      scenePipelineModule(),
+    ]);
+    XR8.run({ canvas: document.getElementById('cam') });
+  } catch (e) {
+    showErr('AR 엔진 초기화 실패: ' + e);
+  }
+}
+
+// 대화 UI
+DonChat.mount();
+const micBtn = document.getElementById('micBtn');
+DonChat.setMic(micBtn);
+micBtn.addEventListener('click', () => { DonChat.open(); DonChat.listen(); });
+
+// 엔진 로드 대기
+const t0 = Date.now();
+const iv = setInterval(() => {
+  if (window.XR8) { clearInterval(iv); start(); }
+  else if (Date.now() - t0 > 25000) {
+    clearInterval(iv);
+    showErr('AR 엔진을 불러오지 못했어요. 네트워크 상태를 확인해 주세요.');
+  }
+}, 100);
+</script>
+</body>
+</html>
