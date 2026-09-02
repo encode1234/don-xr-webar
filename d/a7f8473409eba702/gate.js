@@ -6,7 +6,7 @@
      python -c "import hashlib;print(hashlib.sha256('새암호'.encode()).hexdigest())"
 */
 (function () {
-  var PW_HASH = "18163ce5fd26b9c088f18c6fa52fb39a7059043b602c5a9d852338a1255a8fa8";
+  var PW_HASH = "02b02ad2ce5f6089b47e6f7aac3e6dbc4cea02ff269214392ea43df72845b7fa";
   var KEY = "donxr_ok";
 
   try { if (sessionStorage.getItem(KEY) === "1" || localStorage.getItem(KEY) === "1") return; } catch (e) {}
